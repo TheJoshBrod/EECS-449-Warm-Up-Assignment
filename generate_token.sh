@@ -4,4 +4,4 @@ curl --location 'http://localhost:8000/user/login' \
 --data '{
   "password": "password",
   "email": "test@mail.com"
-}' | grep -oP '"token":"\K[\w\d\.]+' | awk -F'"' '{print $1}'
+}' | grep -oP '"token":"\K[\w\d\._-]+' | awk -F'"' '{print $1}'
