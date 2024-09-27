@@ -7,38 +7,6 @@ glob llm = Ollama(model_name='llama3.1');
 
 glob rag_engine:RagEngine = RagEngine();
 
-# Part 2
-
-node Session {
-    has id: str;
-    has chat_history: list[dict];
-    has status: int = 1;
-
-    can 'Respond to message using chat_history as context and agent_role as the goal of the agent'
-    llm_chat(
-        message:'current message':str,
-        chat_history: 'chat history':list[dict],
-        agent_role:'role of the agent responding':str,
-        context:'retrieved context from documents':list
-    ) -> 'response':str by llm();
-}
-
-
-walker interact {
-    has message: str;
-    has session_id: str;
-
-    can init_session with `root entry {
-         visit [-->](`?Session)(?id == self.session_id) else {
-            session_node = here ++> Session(id=self.session_id, chat_history=[], status=1);
-            print("Session Node Created");
-
-            visit session_node;
-        }
-    }
-}
-
-# New stuff
 
 enum ChatType {
     RAG : 'Need to use Retrievable information in specific documents to respond' = "RAG",
@@ -48,6 +16,11 @@ enum ChatType {
 node Router {
     can 'route the query to the appropriate task type'
     classify(message:'query from the user to be routed.':str) -> ChatType by llm(method="Reason", temperature=0.0);
+}
+
+
+node Chat {
+    has chat_type: ChatType;
 }
 
 walker infer {
@@ -69,10 +42,21 @@ walker infer {
     }
 }
 
+walker interact {
+    has message: str;
+    has session_id: str;
 
-node Chat {
-    has chat_type: ChatType;
+    can init_session with `root entry {
+         visit [-->](`?Session)(?id == self.session_id) else {
+            session_node = here ++> Session(id=self.session_id, chat_history=[], status=1);
+            print("Session Node Created");
+
+            visit session_node;
+        }
+    }
 }
+
+
 
 node RagChat :Chat: {
     has chat_type: ChatType = ChatType.RAG;
@@ -103,7 +87,19 @@ node QAChat :Chat: {
 }
 
 node Session {
-     can chat with interact entry {
+    has id: str;
+    has chat_history: list[dict];
+    has status: int = 1;
+
+    can 'Respond to message using chat_history as context and agent_role as the goal of the agent'
+    llm_chat(
+        message:'current message':str,
+        chat_history: 'chat history':list[dict],
+        agent_role:'role of the agent responding':str,
+        context:'retrieved context from documents':list
+    ) -> 'response':str by llm();
+
+    can chat with interact entry {
         self.chat_history.append({"role": "user", "content": here.message});
         response = infer(message=here.message, chat_history=self.chat_history) spawn root;
         self.chat_history.append({"role": "assistant", "content": response.response});
